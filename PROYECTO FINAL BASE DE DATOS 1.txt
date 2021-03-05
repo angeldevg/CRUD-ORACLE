@@ -1,0 +1,300 @@
+--2 DISPARADORES 
+
+create or replace TRIGGER TRG_CAPTACION 
+BEFORE INSERT ON CAPTACION 
+REFERENCING OLD AS OLD NEW AS NEW 
+FOR EACH ROW 
+BEGIN
+
+    :NEW.ID_CAPTACION := 'CAP' || SEQ_CAPTACION.nextval;
+  NULL;
+END;
+
+
+create or replace TRIGGER TRG_CLIENTES 
+BEFORE INSERT ON CLIENTES 
+REFERENCING OLD AS OLD NEW AS NEW 
+FOR EACH ROW 
+BEGIN
+     :NEW.ID_CLIENTE := 'CLI' || SEQ_CLIENTES.nextval;
+
+  NULL;
+END;
+
+
+
+create or replace TRIGGER TRG_INVERSIONISTAS 
+BEFORE INSERT ON INVERSIONISTAS 
+REFERENCING OLD AS OLD NEW AS NEW 
+FOR EACH ROW 
+BEGIN
+    :NEW.ID_INVERSOR := 'INV' || SEQ_INVERSIONISTAS.nextval;
+  NULL;
+END;
+
+
+
+create or replace TRIGGER TRG_MONEDA 
+BEFORE INSERT ON MONEDAS 
+REFERENCING OLD AS OLD NEW AS NEW 
+FOR EACH ROW 
+BEGIN
+    :NEW.ID_MONEDA := 'MON' || SEQ_MONEDAS.nextval;
+NULL;
+END;
+
+
+
+
+create or replace TRIGGER TRG_PRESTAMOS 
+BEFORE INSERT ON PRESTAMOS 
+REFERENCING OLD AS OLD NEW AS NEW 
+FOR EACH ROW 
+BEGIN
+     :NEW.ID_PRESTAMO := 'PRE' || SEQ_PRESTAMOS.nextval;
+
+  NULL;
+END;
+
+
+
+
+	SECUENCIAS
+
+
+CREATE SEQUENCE SEQ_CAPTACION
+INCREMENT BY 1
+START WITH 1
+NOMINVALUE
+NOMAXVALUE;
+
+
+CREATE SEQUENCE SEQ_CLIENTES
+INCREMENT BY 1
+START WITH 1
+NOMINVALUE
+NOMAXVALUE;
+
+
+
+CREATE SEQUENCE SEQ_CUENTAS
+INCREMENT BY 1
+START WITH 1
+NOMINVALUE
+NOMAXVALUE;
+
+
+
+CREATE SEQUENCE SEQ_INVERSIONISTAS
+INCREMENT BY 1
+START WITH 1
+NOMINVALUE
+NOMAXVALUE;
+
+
+
+CREATE SEQUENCE SEQ_MONEDAS
+INCREMENT BY 1
+START WITH 1
+NOMINVALUE
+NOMAXVALUE;
+
+
+
+CREATE SEQUENCE SEQ_PRESTAMOS
+INCREMENT BY 1
+START WITH 1
+NOMINVALUE
+NOMAXVALUE;
+
+
+
+
+
+--3  FUNCIONES
+
+
+--A)
+
+--       	FUNCIONES INVERSIONES
+
+-- CALCULO DE INTERES MENSUAL
+create or replace function FUN_INTERES (amonto FLOAT, ainteres FLOAT, aplazo number)
+  return float
+ is
+  begin 
+   return round(((amonto * ainteres)/ aplazo), 2);
+  end;
+
+
+
+-- ULTIMO PAGO INTERS + CAPITAL
+
+create or replace function FUN_PAGOTOTAL (amonto float, ainteres float, aplazo float)
+  return float
+ is
+  begin 
+   return round(  (((amonto * ainteres) / aplazo) + amonto),2);
+  end;
+
+
+--B)
+
+--	FUNCIONES PRESTAMOS
+
+-- CALCULO DE INTERS MENSUAL
+
+create or replace function FUN_INPRESTAMO (amonto FLOAT, ainteres FLOAT, aplazo float)
+  return float
+ is
+  begin 
+   return round(((amonto * ainteres)/ aplazo), 2);
+  end;
+
+-- CALCULIO DE ABONO A CAPITAL MENSUAL
+
+create or replace function FUN_CAPITAL (amonto float, aplazo float)
+  return float
+ is
+  begin 
+   return round((amonto / aplazo),2);
+  end;
+
+
+-- PAGO TOTAL MENSUAL INTERES + ABONO A CAPITAL
+
+
+create or replace function FUN_PAGOTOTALPRES (amonto float, ainteres float, aplazo float)
+  return float
+ is
+  begin 
+   return round( (((amonto * ainteres) / aplazo) + (amonto / aplazo)),2);
+  end; 
+
+
+
+
+
+--CALCULO DEL INTERES ANUAL
+
+create or replace function FUN_INPRESTAMO (amonto FLOAT, ainteres FLOAT)
+  return float
+ is
+  begin 
+   return round((amonto * ainteres), 2);
+  end;
+
+--
+
+
+--CALCULO DE LA CUOTA MENSUAL ABONADA AL PRESTAMO
+
+create or replace function FUN_PRESTAMO (amonto float, aplazo float)
+  return float
+ is
+  begin 
+   return round((amonto / aplazo),2);
+  end;
+
+
+--CALCULO DEL PAGO TOTAL INTERES + ABONO DE PRESTAMO
+
+create or replace function FUN_PAGOTOTALPRES (amonto float, ainteres float, aplazo float)
+  return float
+ is
+  begin 
+   return round((amonto * ainteres)+(amonto / aplazo), 2);
+  end;
+
+
+--4.) CONSULTAS
+
+--A)
+
+select pagos_inversionistas.id_inversor,inversionistas.nombre_inversor, captacion.id_moneda, monedas.tipo_moneda,
+fun_interesmonto(fun_montoint(captacion.monto, captacion.interes ), SUM(pagos_inversionistas.cantidad))interes_pendiente
+,sum(pagos_inversionistas.cantidad)interes_pagado,
+captacion.monto capital_a_devolver
+from captacion, pagos_inversionistas, inversionistas, monedas
+where pagos_inversionistas.id_captacion = captacion.id_captacion
+and pagos_inversionistas.id_inversor = inversionistas.id_inversor
+and captacion.id_moneda = monedas.id_moneda
+group by captacion.monto, captacion.interes, pagos_inversionistas.cantidad, captacion.monto, pagos_inversionistas.id_inversor,
+inversionistas.nombre_inversor, captacion.id_moneda, monedas.tipo_moneda;
+
+
+--C)
+
+select prestamos.id_cliente,clientes.nombre_cliente,monedas.tipo_moneda, sum(fun_consultainteres(prestamos.monto, prestamos.interes))interes_total
+from prestamos, monedas, clientes
+where prestamos.id_moneda = monedas.id_moneda
+and prestamos.id_cliente = clientes.id_cliente
+and prestamos.fecha <= (sysdate - 366)
+group by prestamos.id_moneda, prestamos.id_cliente, monedas.tipo_moneda, clientes.nombre_cliente
+order by prestamos.id_cliente;
+
+
+
+D)
+
+select pagos_clientes.id_pago,clientes.nombre_cliente,monedas.tipo_moneda, sum(prestamos.monto)monto_total_prestado,sum(fun_consultainteres(prestamos.monto, prestamos.interes))interes_total,
+pagos_clientes.fecha_pago
+from prestamos, pagos_clientes, monedas, clientes
+where extract(day from pagos_clientes.fecha_pago) > extract(day from prestamos.fecha) and extract(day from pagos_clientes.fecha_pago) < (extract(day from prestamos.fecha)+29)
+and prestamos.id_moneda = monedas.id_moneda
+and pagos_clientes.id_cliente = clientes.id_cliente
+and pagos_clientes.id_prestamo = prestamos.id_prestamo
+group by pagos_clientes.id_pago,prestamos.id_moneda,clientes.nombre_cliente,monedas.tipo_moneda, pagos_clientes.id_cliente, pagos_clientes.fecha_pago;
+
+
+-- 7.) CONSULTAS DE INFORMACION GENEREAL. 
+
+--A)
+
+--INFORMACION DEL INVERSOR Y ACCIONES DE INVERSION
+
+SELECT captacion.id_inversor, nombre_inversor,dpi,inversionistas.telefono, COUNT(CAPTACION.id_captacion)INVERSIONES, 
+sum(captacion.monto)inversion_total
+FROM captacion, inversionistas
+WHERE captacion.id_inversor = inversionistas.id_inversor
+GROUP BY CAPTACION.ID_INVERSOR, inversionistas.nombre_inversor, inversionistas.dpi, inversionistas.telefono
+ORDER BY ID_INVERSOR;
+
+
+--INFORMACION GENERAL DEL INVERSOR Y CADA UNA DE SUS INVERSIONES
+
+select inversionistas.id_inversor, inversionistas.nombre_inversor, inversionistas.dpi, inversionistas.telefono,
+ captacion.id_captacion, captacion.monto, captacion.interes, captacion.plazo, monedas.tipo_moneda
+from inversionistas, monedas, captacion
+where inversionistas.id_inversor = captacion.id_inversor 
+and monedas.id_moneda = captacion.id_moneda
+ORDER BY captacion.id_inversor;
+
+--B)
+
+--INFORMACION DE LOS CLIENTES Y ACCIONES DE PRESTAMOS
+
+SELECT prestamos.id_cliente, clientes.nombre_cliente, clientes.dpi, clientes.telefono, COUNT(id_prestamo)PRESTAMOS,
+sum(prestamos.monto)CANTIDAD
+from prestamos, clientes
+where prestamos.id_cliente = clientes.id_cliente
+GROUP BY prestamos.id_cliente, clientes.nombre_cliente, clientes.dpi, clientes.telefono
+ORDER BY prestamos.id_cliente
+
+
+
+-- INFORMACION DE LOS CLIENTES  Y ACCIONES DE PRESTAMOS , INFORMACION GENERALES
+
+select clientes.id_cliente, clientes.nombre_cliente, clientes.dpi, clientes.telefono,
+prestamos.id_prestamo, prestamos.monto, prestamos.interes, prestamos.plazo, monedas.tipo_moneda
+from clientes, prestamos, monedas
+where clientes.id_cliente = prestamos.id_cliente
+and monedas.id_moneda = prestamos.id_moneda
+order by clientes.id_cliente;
+
+
+
+
+
+select * from vista_pagoinversiones order by id_prestamo;
+select * from vista_proyeccion order by id_prestamo;
